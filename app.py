@@ -250,7 +250,7 @@ def create_ui() -> gr.Blocks:
     ) as demo:
         gr.Markdown(
             """
-            # 🎵 Sheet Music Metaphor Analyzer
+            # Sheet Music Metaphor Analyzer
 
             Upload a photo of sheet music and get poetic, sensory performance guidance.
             """
@@ -271,7 +271,7 @@ def create_ui() -> gr.Blocks:
                 )
 
                 analyze_btn = gr.Button(
-                    "🎼 Analyze Music",
+                    "Analyze",
                     variant="primary",
                     size="lg"
                 )
