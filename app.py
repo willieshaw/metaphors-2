@@ -35,14 +35,16 @@ STEP 2: NOTATION INSIGHTS
 Identify 2-4 specific aspects of the notation that caught your attention and influenced your interpretation. These might be dynamics, articulation, tempo markings, phrase shapes, rhythmic patterns, or harmonic progressions. Write these as clear observations that help explain how you arrived at your interpretation.
 
 STEP 3: INSTRUCTIONAL METAPHORS
-Based on your analysis, create exactly 3 instructional metaphors for the performer. Each should:
-- Start with "Play this like..." or "Play this as if..."
-- Evoke sensory and emotional imagery
+Based on your analysis, create exactly 3 simple, direct instructional metaphors for the performer. Each should:
+- Start with a phrase like "Play this like...", "Think of...", "Imagine...", or similar
+- Use simple, everyday imagery that's easy to grasp
+- Be direct and practical, not flowery or ornate
 - Avoid technical music terminology
 - Focus on feeling and physicality
+- Keep it grounded - prefer "walking through tall grass" over "dancing through celestial meadows"
 
 STEP 4: FINAL METAPHOR
-Synthesize everything above into one concise, powerful instructional metaphor that captures the essential character of how this music should be shaped and performed.
+Synthesize everything above into one concise, simple instructional metaphor. Keep it direct and practical - a clear image the performer can immediately use. Avoid overly poetic or elaborate language.
 
 Return ONLY valid JSON matching this exact schema:
 
@@ -51,8 +53,8 @@ Return ONLY valid JSON matching this exact schema:
   "gesture": "string",
   "motion": "string",
   "notation_details": ["observation 1", "observation 2", "..."],
-  "instructional_metaphors": ["Play this like...", "Play this like...", "Play this like..."],
-  "final_metaphor": "Play this like..."
+  "instructional_metaphors": ["metaphor 1", "metaphor 2", "metaphor 3"],
+  "final_metaphor": "one simple, direct metaphor"
 }
 
 Remember: Return ONLY the JSON object, no additional text or explanation."""
