@@ -49,9 +49,10 @@ http://localhost:7860
 4. Click "Analyze Music" and wait for the results
 
 5. View your metaphorical performance guidance:
-   - The main metaphor is displayed prominently
-   - Musical elements (mood, gesture, motion) are shown below
-   - A list of detailed performance metaphors provides additional guidance
+   - The final instructional metaphor is displayed prominently
+   - Conductor analysis (mood, gesture, motion) provides context
+   - Notation insights show what caught the conductor's attention
+   - Three instructional metaphors guide your performance approach
    - Expand the "Debug" section to see the raw JSON response
 
 ## Project Structure
@@ -69,14 +70,18 @@ http://localhost:7860
 
 1. **Image Processing**: Uploaded images are resized to a maximum width of 1400px to optimize API usage
 
-2. **API Call**: The image is sent to Claude Vision API with a carefully crafted prompt requesting:
-   - Mood description
-   - Gesture description
-   - Motion description
-   - Multiple sensory metaphors
-   - One final, concise metaphor
+2. **Chain-of-Thought Analysis**: The image is sent to Claude Vision API with a structured prompt that guides the AI through:
+   - **Step 1**: Conductor analysis of mood, gesture, and motion
+   - **Step 2**: Identification of notable aspects in the notation
+   - **Step 3**: Creation of exactly 3 instructional metaphors for the performer
+   - **Step 4**: Synthesis into one final, powerful instructional metaphor
 
-3. **JSON Validation**: The response is validated against a strict schema. If validation fails, the system automatically retries with a stricter prompt
+3. **JSON Validation**: The response is validated against a strict schema requiring:
+   - All conductor analysis fields
+   - 2-4 notation detail observations
+   - Exactly 3 instructional metaphors (starting with "Play this like...")
+   - One final metaphor
+   - If validation fails, the system automatically retries with a stricter prompt
 
 4. **Logging**: All API responses and parsed results are logged to the `./logs` directory with timestamps
 
@@ -87,12 +92,25 @@ The application expects responses in the following format:
 ```json
 {
   "mood": "string describing the emotional tone",
-  "gesture": "string describing the physical gesture",
+  "gesture": "string describing the physical conducting gesture",
   "motion": "string describing the movement quality",
-  "metaphors": ["metaphor 1", "metaphor 2", "..."],
-  "final_metaphor": "one concise metaphor for overall sound shaping"
+  "notation_details": [
+    "observation about specific notation element",
+    "another observation that influenced interpretation"
+  ],
+  "instructional_metaphors": [
+    "Play this like...",
+    "Play this like...",
+    "Play this like..."
+  ],
+  "final_metaphor": "Play this like... (one concise, powerful metaphor)"
 }
 ```
+
+The schema enforces:
+- Exactly 3 instructional metaphors
+- At least 2 notation detail observations
+- All fields must be present and non-empty
 
 ## Troubleshooting
 

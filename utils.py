@@ -14,7 +14,8 @@ SCHEMA = {
     "mood": str,
     "gesture": str,
     "motion": str,
-    "metaphors": list,
+    "notation_details": list,
+    "instructional_metaphors": list,
     "final_metaphor": str
 }
 
@@ -111,12 +112,22 @@ def validate_schema(data: Dict[str, Any]) -> tuple[bool, Optional[str]]:
         if not isinstance(data[key], expected_type):
             return False, f"Field '{key}' has wrong type. Expected {expected_type.__name__}, got {type(data[key]).__name__}"
 
-    # Additional validation for metaphors list
-    if not data["metaphors"]:
-        return False, "Field 'metaphors' cannot be empty"
+    # Additional validation for notation_details
+    if not data["notation_details"]:
+        return False, "Field 'notation_details' cannot be empty"
 
-    if not all(isinstance(m, str) for m in data["metaphors"]):
-        return False, "All items in 'metaphors' must be strings"
+    if not all(isinstance(d, str) for d in data["notation_details"]):
+        return False, "All items in 'notation_details' must be strings"
+
+    # Additional validation for instructional_metaphors
+    if not data["instructional_metaphors"]:
+        return False, "Field 'instructional_metaphors' cannot be empty"
+
+    if len(data["instructional_metaphors"]) != 3:
+        return False, f"Field 'instructional_metaphors' must contain exactly 3 items, got {len(data['instructional_metaphors'])}"
+
+    if not all(isinstance(m, str) for m in data["instructional_metaphors"]):
+        return False, "All items in 'instructional_metaphors' must be strings"
 
     return True, None
 

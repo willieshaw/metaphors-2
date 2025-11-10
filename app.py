@@ -21,17 +21,41 @@ from utils import (
 logger = setup_logging()
 
 # Claude API prompt
-ANALYSIS_PROMPT = """You will see a photo of printed sheet music. Describe the mood, gesture, and motion suggested by the notation. Then give metaphorical performance instructions that evoke feeling and physicality (e.g., 'float like a feather drifting down', 'breathe like waves on a calm beach'). Avoid technical language; prioritize sensory and emotional imagery. After metaphors, provide one short plain-language metaphor that tells me how to shape the sound overall. Return JSON only matching the provided schema:
+ANALYSIS_PROMPT = """You are an experienced music conductor and teacher analyzing sheet music to provide performance guidance.
+
+Follow this step-by-step process:
+
+STEP 1: CONDUCTOR ANALYSIS
+As an experienced conductor, examine the musical notation carefully and describe:
+- mood: The emotional tone and feeling the notation suggests
+- gesture: The physical conducting gesture or body movement this would inspire
+- motion: The type of movement quality (e.g., flowing, crisp, sustained, bouncing)
+
+STEP 2: NOTATION INSIGHTS
+Identify 2-4 specific aspects of the notation that caught your attention and influenced your interpretation. These might be dynamics, articulation, tempo markings, phrase shapes, rhythmic patterns, or harmonic progressions. Write these as clear observations that help explain how you arrived at your interpretation.
+
+STEP 3: INSTRUCTIONAL METAPHORS
+Based on your analysis, create exactly 3 instructional metaphors for the performer. Each should:
+- Start with "Play this like..." or "Play this as if..."
+- Evoke sensory and emotional imagery
+- Avoid technical music terminology
+- Focus on feeling and physicality
+
+STEP 4: FINAL METAPHOR
+Synthesize everything above into one concise, powerful instructional metaphor that captures the essential character of how this music should be shaped and performed.
+
+Return ONLY valid JSON matching this exact schema:
 
 {
-  "mood": "string describing the emotional tone",
-  "gesture": "string describing the physical gesture",
-  "motion": "string describing the movement quality",
-  "metaphors": ["metaphor 1", "metaphor 2", "..."],
-  "final_metaphor": "one concise metaphor for overall sound shaping"
+  "mood": "string",
+  "gesture": "string",
+  "motion": "string",
+  "notation_details": ["observation 1", "observation 2", "..."],
+  "instructional_metaphors": ["Play this like...", "Play this like...", "Play this like..."],
+  "final_metaphor": "Play this like..."
 }
 
-Return ONLY valid JSON, no additional text or explanation."""
+Remember: Return ONLY the JSON object, no additional text or explanation."""
 
 
 def resize_image(image: Image.Image, max_width: int = 1400) -> Image.Image:
@@ -196,27 +220,35 @@ def analyze_sheet_music(
         <div style="padding: 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                     border-radius: 15px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
             <h2 style="color: white; margin-bottom: 20px; font-size: 24px; font-weight: 300;">
-                Your Musical Metaphor
+                Performance Guidance
             </h2>
             <p style="color: white; font-size: 32px; font-weight: 500; line-height: 1.5;
                       font-style: italic; margin: 0;">
-                "{parsed_data['final_metaphor']}"
+                {parsed_data['final_metaphor']}
             </p>
         </div>
 
         <div style="margin-top: 25px; padding: 20px; background: #f8f9fa;
                     border-radius: 10px; border-left: 4px solid #667eea;">
-            <h3 style="margin-top: 0; color: #333; font-size: 18px;">Musical Elements</h3>
+            <h3 style="margin-top: 0; color: #333; font-size: 18px;">Conductor Analysis</h3>
             <p style="margin: 10px 0;"><strong>Mood:</strong> {parsed_data['mood']}</p>
             <p style="margin: 10px 0;"><strong>Gesture:</strong> {parsed_data['gesture']}</p>
             <p style="margin: 10px 0;"><strong>Motion:</strong> {parsed_data['motion']}</p>
         </div>
 
+        <div style="margin-top: 20px; padding: 20px; background: #e7f3ff;
+                    border-radius: 10px; border-left: 4px solid #2196f3;">
+            <h3 style="margin-top: 0; color: #333; font-size: 18px;">What the Conductor Noticed</h3>
+            <ul style="margin: 10px 0; padding-left: 20px; line-height: 1.8;">
+                {"".join(f'<li>{detail}</li>' for detail in parsed_data['notation_details'])}
+            </ul>
+        </div>
+
         <div style="margin-top: 20px; padding: 20px; background: #fff3cd;
                     border-radius: 10px; border-left: 4px solid #ffc107;">
-            <h3 style="margin-top: 0; color: #333; font-size: 18px;">Performance Metaphors</h3>
+            <h3 style="margin-top: 0; color: #333; font-size: 18px;">Instructional Metaphors</h3>
             <ul style="margin: 10px 0; padding-left: 20px; line-height: 1.8;">
-                {"".join(f'<li>{m}</li>' for m in parsed_data['metaphors'])}
+                {"".join(f'<li>{m}</li>' for m in parsed_data['instructional_metaphors'])}
             </ul>
         </div>
         """
@@ -271,7 +303,7 @@ def create_ui() -> gr.Blocks:
                 )
 
                 analyze_btn = gr.Button(
-                    "Analyze",
+                    "Analyze Music",
                     variant="primary",
                     size="lg"
                 )
@@ -286,7 +318,7 @@ def create_ui() -> gr.Blocks:
                     lines=2
                 )
 
-                with gr.Accordion("🔍 Debug: Full JSON Response", open=False):
+                with gr.Accordion("Debug: Full JSON Response", open=False):
                     json_output = gr.Code(
                         label="Raw JSON",
                         language="json",
