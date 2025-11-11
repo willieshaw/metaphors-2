@@ -363,7 +363,7 @@ def main():
         )
 
     demo = create_ui()
-    demo.launch()
+    demo.launch(share=True)
 
 
 if __name__ == "__main__":
