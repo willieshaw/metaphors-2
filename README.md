@@ -2,6 +2,18 @@
 
 A minimal web application that analyzes sheet music photos using Claude Vision API and provides poetic, sensory performance guidance through metaphors.
 
+## Deploy to Hugging Face Spaces (FREE)
+
+Want to host this for others to use? Deploy it for free on Hugging Face Spaces!
+
+**[View Deployment Guide →](DEPLOYMENT.md)**
+
+Quick steps:
+1. Create a free [Hugging Face](https://huggingface.co/) account
+2. Create a new Space with Gradio SDK
+3. Upload these files or connect your GitHub repo
+4. Share the URL - users provide their own API keys
+
 ## Features
 
 - Upload photos of printed sheet music

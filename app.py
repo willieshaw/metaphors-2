@@ -286,7 +286,9 @@ def create_ui() -> gr.Blocks:
             """
             # Sheet Music Metaphor Analyzer
 
-            Upload a photo of sheet music and get poetic, sensory performance guidance.
+            Upload a photo of sheet music and get poetic, sensory performance guidance from an AI conductor.
+
+            **Note:** You need your own [Anthropic API key](https://console.anthropic.com/) to use this app.
             """
         )
 
@@ -299,9 +301,9 @@ def create_ui() -> gr.Blocks:
                 )
 
                 api_key_input = gr.Textbox(
-                    label="Anthropic API Key (optional, uses env var if empty)",
+                    label="Anthropic API Key (required)",
                     type="password",
-                    placeholder="sk-ant-..."
+                    placeholder="sk-ant-api-..."
                 )
 
                 analyze_btn = gr.Button(
@@ -361,11 +363,7 @@ def main():
         )
 
     demo = create_ui()
-    demo.launch(
-        server_name="127.0.0.1",
-        server_port=7860,
-        share=False
-    )
+    demo.launch()
 
 
 if __name__ == "__main__":
