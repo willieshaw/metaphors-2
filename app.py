@@ -154,7 +154,7 @@ def image_to_base64(image: Image.Image) -> str:
     return base64.b64encode(buffered.getvalue()).decode("utf-8")
 
 
-def save_feedback(metaphor: str, rating: int, parsed_data: Dict[str, Any]) -> None:
+def save_feedback(metaphor: str, rating: int, parsed_data: Dict[str, Any]) -> str:
     """
     Save user feedback to Hugging Face Dataset (if HF_TOKEN available) or CSV file (fallback).
 
@@ -162,10 +162,14 @@ def save_feedback(metaphor: str, rating: int, parsed_data: Dict[str, Any]) -> No
         metaphor: The final metaphor that was rated
         rating: User rating (1-5)
         parsed_data: Full parsed response data
+
+    Returns:
+        Timestamp of the feedback entry (for undo functionality)
     """
-    # Prepare feedback data
+    # Prepare feedback data with timestamp
+    timestamp = datetime.now().isoformat()
     feedback_entry = {
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": timestamp,
         "rating": rating,
         "final_metaphor": metaphor,
         "mood": parsed_data.get("mood", ""),
@@ -231,7 +235,7 @@ def save_feedback(metaphor: str, rating: int, parsed_data: Dict[str, Any]) -> No
                 temp_file.unlink()
 
             logger.info(f"Feedback saved to HF dataset {dataset_id}: rating={rating}, metaphor={metaphor[:50]}...")
-            return
+            return timestamp
 
         except Exception as e:
             logger.warning(f"Failed to save to HF dataset, falling back to CSV: {e}")
@@ -271,6 +275,113 @@ def save_feedback(metaphor: str, rating: int, parsed_data: Dict[str, Any]) -> No
         ])
 
     logger.info(f"Feedback saved to local CSV: rating={rating}, metaphor={metaphor[:50]}...")
+    return timestamp
+
+
+def undo_feedback(timestamp: str) -> bool:
+    """
+    Delete a feedback entry by timestamp from HF Dataset or CSV file.
+
+    Args:
+        timestamp: ISO format timestamp of the feedback to delete
+
+    Returns:
+        True if deletion was successful, False otherwise
+    """
+    # Try to delete from Hugging Face Dataset
+    hf_token = os.getenv("HF_TOKEN")
+    hf_dataset_name = os.getenv("HF_DATASET_NAME", "sheet-music-feedback")
+
+    if HF_AVAILABLE and hf_token:
+        try:
+            api = HfApi(token=hf_token)
+
+            # Get HF username from token
+            user_info = api.whoami()
+            username = user_info['name']
+            dataset_id = f"{username}/{hf_dataset_name}"
+
+            # Download existing data
+            local_file = hf_hub_download(
+                repo_id=dataset_id,
+                filename="feedback.csv",
+                repo_type="dataset",
+                token=hf_token
+            )
+
+            # Read and filter data
+            import pandas as pd
+            df = pd.read_csv(local_file)
+            original_len = len(df)
+
+            # Remove row with matching timestamp
+            df = df[df['timestamp'] != timestamp]
+
+            if len(df) == original_len:
+                logger.warning(f"Timestamp {timestamp} not found in HF dataset")
+                return False
+
+            # Save to temporary file
+            temp_file = Path("./temp_feedback.csv")
+            df.to_csv(temp_file, index=False)
+
+            # Upload to HF
+            api.upload_file(
+                path_or_fileobj=str(temp_file),
+                path_in_repo="feedback.csv",
+                repo_id=dataset_id,
+                repo_type="dataset",
+                commit_message="Undo feedback submission"
+            )
+
+            # Clean up temp file
+            if temp_file.exists():
+                temp_file.unlink()
+
+            logger.info(f"Feedback with timestamp {timestamp} removed from HF dataset")
+            return True
+
+        except Exception as e:
+            logger.warning(f"Failed to undo from HF dataset, trying CSV: {e}")
+
+    # Fallback to CSV (for local development or if HF fails)
+    feedback_file = Path("./feedback/ratings.csv")
+
+    if not feedback_file.exists():
+        logger.warning("No local feedback CSV file found")
+        return False
+
+    try:
+        # Read all rows
+        rows = []
+        with open(feedback_file, "r", newline="", encoding="utf-8") as f:
+            reader = csv.reader(f)
+            headers = next(reader)
+            rows = [headers]
+
+            found = False
+            for row in reader:
+                # Skip the row with matching timestamp
+                if row[0] == timestamp:
+                    found = True
+                    continue
+                rows.append(row)
+
+        if not found:
+            logger.warning(f"Timestamp {timestamp} not found in local CSV")
+            return False
+
+        # Write back all rows except the one we're deleting
+        with open(feedback_file, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerows(rows)
+
+        logger.info(f"Feedback with timestamp {timestamp} removed from local CSV")
+        return True
+
+    except Exception as e:
+        logger.error(f"Failed to undo feedback from CSV: {e}")
+        return False
 
 
 def analyze_sheet_music(
@@ -381,7 +492,7 @@ def analyze_sheet_music(
                             },
                             {
                                 "type": "text",
-                                "text": ANALYSIS_PROMPT
+                                "text": ANALYSIS_PROMPTS[prompt_key]
                             }
                         ],
                     },
@@ -466,26 +577,54 @@ def analyze_sheet_music(
         return create_error_html(error_msg), "", "", {}
 
 
-def handle_feedback(rating: int, parsed_data: Dict[str, Any]) -> str:
+def handle_feedback(rating: int, parsed_data: Dict[str, Any], feedback_submitted: bool) -> Tuple[str, bool, str, int, bool]:
     """
     Handle user feedback submission.
 
     Args:
         rating: User rating (1-5)
         parsed_data: The parsed analysis data
+        feedback_submitted: Whether feedback has already been submitted
 
     Returns:
-        Confirmation message
+        Tuple of (message, feedback_submitted, timestamp, rating, undo_visible)
     """
+    if feedback_submitted:
+        return "Feedback already submitted for this analysis.", True, "", rating, True
+
     if not parsed_data or "final_metaphor" not in parsed_data:
-        return "Please analyze an image first before submitting feedback."
+        return "Please analyze an image first before submitting feedback.", False, "", 0, False
 
     try:
-        save_feedback(parsed_data["final_metaphor"], rating, parsed_data)
-        return f"Thank you for your feedback! (Rating: {rating}/5)"
+        timestamp = save_feedback(parsed_data["final_metaphor"], rating, parsed_data)
+        return f"Feedback submitted ({rating}/5)", True, timestamp, rating, True
     except Exception as e:
         logger.error(f"Failed to save feedback: {e}")
-        return "Failed to save feedback. Please try again."
+        return "Failed to save feedback. Please try again.", False, "", 0, False
+
+
+def handle_undo_feedback(timestamp: str) -> Tuple[str, bool, str, int, bool]:
+    """
+    Handle undoing a feedback submission.
+
+    Args:
+        timestamp: Timestamp of the feedback to undo
+
+    Returns:
+        Tuple of (message, feedback_submitted, timestamp, rating, undo_visible)
+    """
+    if not timestamp:
+        return "", False, "", 0, False
+
+    try:
+        success = undo_feedback(timestamp)
+        if success:
+            return "", False, "", 0, False
+        else:
+            return "Failed to undo feedback.", True, timestamp, 0, True
+    except Exception as e:
+        logger.error(f"Failed to undo feedback: {e}")
+        return "Failed to undo feedback.", True, timestamp, 0, True
 
 
 def create_ui() -> gr.Blocks:
@@ -598,6 +737,11 @@ def create_ui() -> gr.Blocks:
         parsed_data_state = gr.State({})
         reroll_count_state = gr.State(0)
 
+        # State variables for feedback tracking
+        feedback_submitted_state = gr.State(False)
+        feedback_timestamp_state = gr.State("")
+        submitted_rating_state = gr.State(0)
+
         with gr.Row():
             with gr.Column(scale=1):
                 image_input = gr.Image(
@@ -666,6 +810,7 @@ def create_ui() -> gr.Blocks:
                         rating_4 = gr.Button("4", size="lg", elem_classes=["rating-button"])
                         rating_5 = gr.Button("5", size="lg", elem_classes=["rating-button"])
                     feedback_message = gr.Markdown("")
+                    undo_btn = gr.Button("Undo", visible=False, variant="secondary", size="sm")
 
                 # Interpretability sections (hidden by default for users)
                 with gr.Accordion("Interpretability Details", open=False, elem_classes=["accordion-title"]):
@@ -702,7 +847,8 @@ def create_ui() -> gr.Blocks:
                 """
                 return (
                     error_html, "", "", {},
-                    image, {}, 0, gr.update(visible=False), gr.update(visible=False), ""
+                    image, {}, 0, gr.update(visible=False), gr.update(visible=False), "",
+                    False, "", 0, "", gr.update(visible=False)
                 )
 
             metaphor_html, interp_html, json_out, parsed_data = analyze_sheet_music(image, api_key, prompt_key)
@@ -716,7 +862,8 @@ def create_ui() -> gr.Blocks:
 
             return (
                 metaphor_html, interp_html, json_out, parsed_data,
-                image, parsed_data, 0, reroll_visible, feedback_visible, status_msg
+                image, parsed_data, 0, reroll_visible, feedback_visible, status_msg,
+                False, "", 0, "", gr.update(visible=False)
             )
 
         # Reroll function
@@ -733,7 +880,8 @@ def create_ui() -> gr.Blocks:
                 """
                 return (
                     max_error_html, gr.update(), gr.update(), gr.update(),
-                    current_count, gr.update(visible=False), f"Maximum rerolls reached (3/3)"
+                    current_count, gr.update(visible=False), f"Maximum rerolls reached (3/3)",
+                    False, "", 0, "", gr.update(visible=False)
                 )
 
             if image is None:
@@ -748,7 +896,8 @@ def create_ui() -> gr.Blocks:
                 """
                 return (
                     no_image_error_html, gr.update(), gr.update(), gr.update(),
-                    current_count, gr.update(), f"Rerolls remaining: {3 - current_count}"
+                    current_count, gr.update(), f"Rerolls remaining: {3 - current_count}",
+                    False, "", 0, "", gr.update(visible=False)
                 )
 
             metaphor_html, interp_html, json_out, parsed_data = analyze_sheet_music(image, api_key, prompt_key)
@@ -760,12 +909,13 @@ def create_ui() -> gr.Blocks:
 
             return (
                 metaphor_html, interp_html, json_out, parsed_data,
-                new_count, gr.update(visible=show_reroll), status_msg
+                new_count, gr.update(visible=show_reroll), status_msg,
+                False, "", 0, "", gr.update(visible=False)
             )
 
         # Reset reroll count when new image is uploaded
         def reset_reroll_count(image):
-            return 0, gr.update(visible=False), ""
+            return 0, gr.update(visible=False), "", False, "", 0, "", gr.update(visible=False)
 
         # Event handlers
         analyze_btn.click(
@@ -774,7 +924,9 @@ def create_ui() -> gr.Blocks:
             outputs=[
                 result_html, interpretability_output, json_output, parsed_data_state,
                 current_image_state, parsed_data_state, reroll_count_state,
-                reroll_btn, feedback_group, reroll_status
+                reroll_btn, feedback_group, reroll_status,
+                feedback_submitted_state, feedback_timestamp_state, submitted_rating_state,
+                feedback_message, undo_btn
             ]
         ).then(
             fn=lambda: gr.update(visible=True),
@@ -786,26 +938,58 @@ def create_ui() -> gr.Blocks:
             inputs=[current_image_state, api_key_input, prompt_selector, reroll_count_state],
             outputs=[
                 result_html, interpretability_output, json_output, parsed_data_state,
-                reroll_count_state, reroll_btn, reroll_status
+                reroll_count_state, reroll_btn, reroll_status,
+                feedback_submitted_state, feedback_timestamp_state, submitted_rating_state,
+                feedback_message, undo_btn
             ]
         )
 
         image_input.change(
             fn=reset_reroll_count,
             inputs=[image_input],
-            outputs=[reroll_count_state, reroll_btn, reroll_status]
+            outputs=[
+                reroll_count_state, reroll_btn, reroll_status,
+                feedback_submitted_state, feedback_timestamp_state, submitted_rating_state,
+                feedback_message, undo_btn
+            ]
         )
 
         # Feedback button handlers
-        def submit_rating(rating, data):
-            msg = handle_feedback(rating, data)
-            return msg
+        def submit_rating(rating, data, feedback_submitted):
+            return handle_feedback(rating, data, feedback_submitted)
 
-        rating_1.click(lambda data: submit_rating(1, data), inputs=[parsed_data_state], outputs=[feedback_message])
-        rating_2.click(lambda data: submit_rating(2, data), inputs=[parsed_data_state], outputs=[feedback_message])
-        rating_3.click(lambda data: submit_rating(3, data), inputs=[parsed_data_state], outputs=[feedback_message])
-        rating_4.click(lambda data: submit_rating(4, data), inputs=[parsed_data_state], outputs=[feedback_message])
-        rating_5.click(lambda data: submit_rating(5, data), inputs=[parsed_data_state], outputs=[feedback_message])
+        rating_1.click(
+            lambda data, submitted: submit_rating(1, data, submitted),
+            inputs=[parsed_data_state, feedback_submitted_state],
+            outputs=[feedback_message, feedback_submitted_state, feedback_timestamp_state, submitted_rating_state, undo_btn]
+        )
+        rating_2.click(
+            lambda data, submitted: submit_rating(2, data, submitted),
+            inputs=[parsed_data_state, feedback_submitted_state],
+            outputs=[feedback_message, feedback_submitted_state, feedback_timestamp_state, submitted_rating_state, undo_btn]
+        )
+        rating_3.click(
+            lambda data, submitted: submit_rating(3, data, submitted),
+            inputs=[parsed_data_state, feedback_submitted_state],
+            outputs=[feedback_message, feedback_submitted_state, feedback_timestamp_state, submitted_rating_state, undo_btn]
+        )
+        rating_4.click(
+            lambda data, submitted: submit_rating(4, data, submitted),
+            inputs=[parsed_data_state, feedback_submitted_state],
+            outputs=[feedback_message, feedback_submitted_state, feedback_timestamp_state, submitted_rating_state, undo_btn]
+        )
+        rating_5.click(
+            lambda data, submitted: submit_rating(5, data, submitted),
+            inputs=[parsed_data_state, feedback_submitted_state],
+            outputs=[feedback_message, feedback_submitted_state, feedback_timestamp_state, submitted_rating_state, undo_btn]
+        )
+
+        # Undo button handler
+        undo_btn.click(
+            fn=handle_undo_feedback,
+            inputs=[feedback_timestamp_state],
+            outputs=[feedback_message, feedback_submitted_state, feedback_timestamp_state, submitted_rating_state, undo_btn]
+        )
 
     return demo
 
