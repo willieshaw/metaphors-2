@@ -34,7 +34,7 @@ logger = setup_logging()
 # To add/edit prompts: simply add or modify entries in this dictionary
 # Each prompt must return the same JSON schema
 ANALYSIS_PROMPTS = {
-    "Prompt 1 (Current)": """You are an experienced music conductor and teacher analyzing sheet music to provide performance guidance.
+    "Prompt 1": """You are an experienced music conductor and teacher analyzing sheet music to provide performance guidance.
 
 Follow this step-by-step process:
 
@@ -72,7 +72,45 @@ Return ONLY valid JSON matching this exact schema:
 
 Remember: Return ONLY the JSON object, no additional text or explanation.""",
 
-    "Prompt 2": """[Add your second test prompt here - must return the same JSON schema]""",
+    "Prompt 2": """You are an experienced music conductor and teacher analyzing sheet music to provide performance guidance.
+
+Follow this step-by-step process:
+
+STEP 1: CONDUCTOR ANALYSIS
+As an experienced conductor, examine the musical notation carefully and describe:
+- mood: The emotional tone and feeling the notation suggests
+- gesture: The physical conducting gesture or body movement this would inspire
+- motion: The type of movement quality (e.g., flowing, crisp, sustained, bouncing)
+
+STEP 2: NOTATION INSIGHTS
+Identify 2-4 specific aspects of the notation that caught your attention and influenced your interpretation. These might be dynamics, articulation, tempo markings, phrase shapes, rhythmic patterns, or harmonic progressions. Write these as clear observations that help explain how you arrived at your interpretation.
+
+STEP 3: INSTRUCTIONAL METAPHORS
+Based on your analysis, create exactly 3 simple, direct instructional metaphors for the performer. Each should:
+- Start with a phrase like "Play this like...", "Think of...", "Imagine...", or similar
+- Use simple, everyday imagery that's easy to grasp
+- Be direct and practical, not flowery or ornate
+- Avoid technical music terminology
+- Focus on feeling and physicality
+- Keep it grounded - prefer "walking through tall grass" over "dancing through celestial meadows"
+
+STEP 4: FINAL METAPHOR
+Now, keep in mind the following weights as you deliver your final metaphor: The mood 25%, gesture 25%, motion 50%. 
+Synthesize everything above — including 20% more emphasis on the Notation Insights — into one concise, simple instructional metaphor that reflects how emotion, gesture, and movement emerge directly from the score.
+Keep it direct and practical, giving a clear, physical image the performer can immediately use.
+
+Return ONLY valid JSON matching this exact schema:
+
+{
+  "mood": "string",
+  "gesture": "string",
+  "motion": "string",
+  "notation_details": ["observation 1", "observation 2", "..."],
+  "instructional_metaphors": ["metaphor 1", "metaphor 2", "metaphor 3"],
+  "final_metaphor": "one simple, direct metaphor"
+}
+
+Remember: Return ONLY the JSON object, no additional text or explanation.""",
 
     "Prompt 3": """[Add your third test prompt here - must return the same JSON schema]""",
 
@@ -376,9 +414,9 @@ def analyze_sheet_music(
         # Format main metaphor output
         final_metaphor_html = f"""
         <div style="padding: 30px 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    border-radius: 15px; text-align: center;">
+                    border-radius: 10px; text-align: center;">
             <p style="color: white; font-size: clamp(20px, 6vw, 28px); font-weight: 500; line-height: 1.4;
-                      font-style: italic; margin: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+                    margin: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
                 {parsed_data['final_metaphor']}
             </p>
         </div>
@@ -508,7 +546,7 @@ def create_ui() -> gr.Blocks:
     /* Feedback section styling */
     .feedback-section {
         padding: 20px;
-        background: #f8f9fa;
+
         border-radius: 10px;
         border-left: 4px solid #667eea;
         margin-top: 20px;
