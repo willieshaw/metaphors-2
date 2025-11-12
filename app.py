@@ -269,12 +269,8 @@ def analyze_sheet_music(
 
         # Format main metaphor output
         final_metaphor_html = f"""
-        <div style="padding: 25px 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        <div style="padding: 30px 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                     border-radius: 15px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
-            <h2 style="color: white; margin-bottom: 15px; font-size: clamp(18px, 5vw, 22px);
-                       font-weight: 300; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
-                Instructional Metaphor
-            </h2>
             <p style="color: white; font-size: clamp(20px, 6vw, 28px); font-weight: 500; line-height: 1.4;
                       font-style: italic; margin: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
                 {parsed_data['final_metaphor']}
@@ -465,7 +461,7 @@ def create_ui() -> gr.Blocks:
             with gr.Column(scale=1):
                 image_input = gr.Image(
                     type="pil",
-                    label="Upload Sheet Music Photo",
+                    label="Take photo or drop image here",
                     height=400,
                     sources=["upload", "webcam"]  # Enable both upload and camera for mobile
                 )
@@ -500,7 +496,16 @@ def create_ui() -> gr.Blocks:
                 result_html = gr.HTML(
                     label="",
                     show_label=False,
-                    value=""
+                    value="""
+                    <div style="padding: 30px 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                                border-radius: 15px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+                                min-height: 100px; display: flex; align-items: center; justify-content: center;">
+                        <p style="color: rgba(255, 255, 255, 0.7); font-size: 16px; margin: 0;
+                                  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+                            Upload a photo to receive your instructional metaphor
+                        </p>
+                    </div>
+                    """
                 )
 
                 # Feedback section
