@@ -577,7 +577,7 @@ def analyze_sheet_music(
         return create_error_html(error_msg), "", "", {}
 
 
-def handle_feedback(rating: int, parsed_data: Dict[str, Any], feedback_submitted: bool) -> Tuple[str, bool, str, int, bool]:
+def handle_feedback(rating: int, parsed_data: Dict[str, Any], feedback_submitted: bool):
     """
     Handle user feedback submission.
 
@@ -587,23 +587,23 @@ def handle_feedback(rating: int, parsed_data: Dict[str, Any], feedback_submitted
         feedback_submitted: Whether feedback has already been submitted
 
     Returns:
-        Tuple of (message, feedback_submitted, timestamp, rating, undo_visible)
+        Tuple of (message, feedback_submitted, timestamp, rating, undo_button_update)
     """
     if feedback_submitted:
-        return "Feedback already submitted for this analysis.", True, "", rating, True
+        return "Feedback already submitted for this analysis.", True, "", rating, gr.update(visible=True)
 
     if not parsed_data or "final_metaphor" not in parsed_data:
-        return "Please analyze an image first before submitting feedback.", False, "", 0, False
+        return "Please analyze an image first before submitting feedback.", False, "", 0, gr.update(visible=False)
 
     try:
         timestamp = save_feedback(parsed_data["final_metaphor"], rating, parsed_data)
-        return f"Feedback submitted ({rating}/5)", True, timestamp, rating, True
+        return f"Feedback submitted ({rating}/5)", True, timestamp, rating, gr.update(visible=True)
     except Exception as e:
         logger.error(f"Failed to save feedback: {e}")
-        return "Failed to save feedback. Please try again.", False, "", 0, False
+        return "Failed to save feedback. Please try again.", False, "", 0, gr.update(visible=False)
 
 
-def handle_undo_feedback(timestamp: str) -> Tuple[str, bool, str, int, bool]:
+def handle_undo_feedback(timestamp: str):
     """
     Handle undoing a feedback submission.
 
@@ -611,20 +611,20 @@ def handle_undo_feedback(timestamp: str) -> Tuple[str, bool, str, int, bool]:
         timestamp: Timestamp of the feedback to undo
 
     Returns:
-        Tuple of (message, feedback_submitted, timestamp, rating, undo_visible)
+        Tuple of (message, feedback_submitted, timestamp, rating, undo_button_update)
     """
     if not timestamp:
-        return "", False, "", 0, False
+        return "", False, "", 0, gr.update(visible=False)
 
     try:
         success = undo_feedback(timestamp)
         if success:
-            return "", False, "", 0, False
+            return "", False, "", 0, gr.update(visible=False)
         else:
-            return "Failed to undo feedback.", True, timestamp, 0, True
+            return "Failed to undo feedback.", True, timestamp, 0, gr.update(visible=True)
     except Exception as e:
         logger.error(f"Failed to undo feedback: {e}")
-        return "Failed to undo feedback.", True, timestamp, 0, True
+        return "Failed to undo feedback.", True, timestamp, 0, gr.update(visible=True)
 
 
 def create_ui() -> gr.Blocks:
