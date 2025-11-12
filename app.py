@@ -386,6 +386,49 @@ def create_ui() -> gr.Blocks:
     .gr-form {
         gap: 15px;
     }
+
+    /* Rating buttons styling */
+    .rating-buttons {
+        display: flex !important;
+        gap: 8px !important;
+        flex-wrap: nowrap !important;
+        width: 100% !important;
+    }
+
+    .rating-button {
+        flex: 1 1 0 !important;
+        min-width: 0 !important;
+        font-size: 20px !important;
+        font-weight: 600 !important;
+        padding: 12px 8px !important;
+    }
+
+    /* Feedback section styling */
+    .feedback-section {
+        padding: 20px;
+        background: #f8f9fa;
+        border-radius: 10px;
+        border-left: 4px solid #667eea;
+        margin-top: 20px;
+    }
+
+    .feedback-title {
+        margin: 0 0 15px 0 !important;
+        font-size: 16px !important;
+        font-weight: 500 !important;
+        color: #333 !important;
+    }
+
+    /* Accordion title styling with purple */
+    .accordion-title {
+        color: #667eea !important;
+        font-weight: 500 !important;
+    }
+
+    /* Override Gradio accordion styling */
+    .gr-accordion {
+        border-left: 4px solid #667eea !important;
+    }
     """
 
     with gr.Blocks(
@@ -446,28 +489,31 @@ def create_ui() -> gr.Blocks:
                 result_html = gr.HTML(label="Result")
 
                 # Feedback section
-                with gr.Group(visible=False) as feedback_group:
-                    gr.Markdown("### How helpful was this metaphor?")
-                    with gr.Row():
-                        rating_1 = gr.Button("1 ⭐", size="sm")
-                        rating_2 = gr.Button("2 ⭐", size="sm")
-                        rating_3 = gr.Button("3 ⭐", size="sm")
-                        rating_4 = gr.Button("4 ⭐", size="sm")
-                        rating_5 = gr.Button("5 ⭐", size="sm")
+                with gr.Group(visible=False, elem_classes=["feedback-section"]) as feedback_group:
+                    gr.Markdown("### How helpful was this metaphor?", elem_classes=["feedback-title"])
+                    with gr.Row(elem_classes=["rating-buttons"]):
+                        rating_1 = gr.Button("1", size="lg", elem_classes=["rating-button"])
+                        rating_2 = gr.Button("2", size="lg", elem_classes=["rating-button"])
+                        rating_3 = gr.Button("3", size="lg", elem_classes=["rating-button"])
+                        rating_4 = gr.Button("4", size="lg", elem_classes=["rating-button"])
+                        rating_5 = gr.Button("5", size="lg", elem_classes=["rating-button"])
                     feedback_message = gr.Markdown("")
 
-                error_output = gr.Textbox(
-                    label="Errors",
-                    visible=True,
-                    interactive=False,
-                    lines=2
-                )
+                # Error section (hidden in accordion)
+                with gr.Accordion("Errors", open=False, elem_classes=["accordion-title"]):
+                    error_output = gr.Textbox(
+                        label="",
+                        visible=True,
+                        interactive=False,
+                        lines=2,
+                        show_label=False
+                    )
 
                 # Interpretability sections (hidden by default for users)
-                with gr.Accordion("Admin: Interpretability Details", open=False):
+                with gr.Accordion("Admin: Interpretability Details", open=False, elem_classes=["accordion-title"]):
                     interpretability_output = gr.HTML()
 
-                with gr.Accordion("Admin: Full JSON Response", open=False):
+                with gr.Accordion("Admin: Full JSON Response", open=False, elem_classes=["accordion-title"]):
                     json_output = gr.Code(
                         label="Raw JSON",
                         language="json",
