@@ -3,9 +3,13 @@ Sheet Music Metaphor Analyzer - Main Gradio Application
 """
 
 import base64
+import csv
 import io
+import json
 import os
-from typing import Optional, Tuple
+from datetime import datetime
+from pathlib import Path
+from typing import Optional, Tuple, Dict, Any
 
 import anthropic
 import gradio as gr
@@ -94,10 +98,56 @@ def image_to_base64(image: Image.Image) -> str:
     return base64.b64encode(buffered.getvalue()).decode("utf-8")
 
 
+def save_feedback(metaphor: str, rating: int, parsed_data: Dict[str, Any]) -> None:
+    """
+    Save user feedback to CSV file.
+
+    Args:
+        metaphor: The final metaphor that was rated
+        rating: User rating (1-5)
+        parsed_data: Full parsed response data
+    """
+    feedback_dir = Path("./feedback")
+    feedback_dir.mkdir(exist_ok=True)
+
+    feedback_file = feedback_dir / "ratings.csv"
+
+    # Check if file exists to write header
+    file_exists = feedback_file.exists()
+
+    with open(feedback_file, "a", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+
+        if not file_exists:
+            writer.writerow([
+                "timestamp",
+                "rating",
+                "final_metaphor",
+                "mood",
+                "gesture",
+                "motion",
+                "instructional_metaphors",
+                "notation_details"
+            ])
+
+        writer.writerow([
+            datetime.now().isoformat(),
+            rating,
+            metaphor,
+            parsed_data.get("mood", ""),
+            parsed_data.get("gesture", ""),
+            parsed_data.get("motion", ""),
+            " | ".join(parsed_data.get("instructional_metaphors", [])),
+            " | ".join(parsed_data.get("notation_details", []))
+        ])
+
+    logger.info(f"Feedback saved: rating={rating}, metaphor={metaphor[:50]}...")
+
+
 def analyze_sheet_music(
     image: Optional[Image.Image],
     api_key: Optional[str] = None
-) -> Tuple[str, str, str]:
+) -> Tuple[str, str, str, Dict[str, Any], str]:
     """
     Analyze sheet music image using Claude Vision API.
 
@@ -106,19 +156,19 @@ def analyze_sheet_music(
         api_key: Optional API key (uses env var if not provided)
 
     Returns:
-        Tuple of (final_metaphor_html, json_output, error_message)
+        Tuple of (final_metaphor_html, interpretability_html, json_output, parsed_data_dict, error_message)
     """
     if image is None:
-        return "", "", "Please upload an image first."
+        return "", "", "", {}, "Please upload an image first."
 
     # Get API key
     if not api_key:
         api_key = os.getenv("ANTHROPIC_API_KEY")
 
     if not api_key:
-        error_msg = "ANTHROPIC_API_KEY not found in environment variables."
+        error_msg = "API key required. Please paste in the API key you were provided."
         logger.error(error_msg)
-        return "", "", error_msg
+        return "", "", "", {}, error_msg
 
     try:
         # Resize image
@@ -215,60 +265,87 @@ def analyze_sheet_music(
 
         # Handle results
         if parsed_data is None:
-            return "", raw_response, f"Failed to parse response: {error}"
+            return "", "", raw_response, {}, f"Failed to parse response: {error}"
 
-        # Format outputs
+        # Format main metaphor output
         final_metaphor_html = f"""
-        <div style="padding: 30px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        <div style="padding: 25px 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                     border-radius: 15px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
-            <h2 style="color: white; margin-bottom: 20px; font-size: 24px; font-weight: 300;">
-                Performance Guidance
+            <h2 style="color: white; margin-bottom: 15px; font-size: clamp(18px, 5vw, 22px);
+                       font-weight: 300; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+                Instructional Metaphor
             </h2>
-            <p style="color: white; font-size: 32px; font-weight: 500; line-height: 1.5;
-                      font-style: italic; margin: 0;">
+            <p style="color: white; font-size: clamp(20px, 6vw, 28px); font-weight: 500; line-height: 1.4;
+                      font-style: italic; margin: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
                 {parsed_data['final_metaphor']}
             </p>
         </div>
+        """
 
-        <div style="margin-top: 25px; padding: 20px; background: #f8f9fa;
-                    border-radius: 10px; border-left: 4px solid #667eea;">
-            <h3 style="margin-top: 0; color: #333; font-size: 18px;">Conductor Analysis</h3>
-            <p style="margin: 10px 0;"><strong>Mood:</strong> {parsed_data['mood']}</p>
-            <p style="margin: 10px 0;"><strong>Gesture:</strong> {parsed_data['gesture']}</p>
-            <p style="margin: 10px 0;"><strong>Motion:</strong> {parsed_data['motion']}</p>
-        </div>
+        # Format interpretability sections (for admin/debug)
+        interpretability_html = f"""
+        <div style="margin-top: 20px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+            <div style="margin-bottom: 15px; padding: 15px; background: #f8f9fa;
+                        border-radius: 10px; border-left: 4px solid #667eea;">
+                <h3 style="margin-top: 0; color: #333; font-size: 16px;">Conductor Analysis</h3>
+                <p style="margin: 8px 0; font-size: 14px;"><strong>Mood:</strong> {parsed_data['mood']}</p>
+                <p style="margin: 8px 0; font-size: 14px;"><strong>Gesture:</strong> {parsed_data['gesture']}</p>
+                <p style="margin: 8px 0; font-size: 14px;"><strong>Motion:</strong> {parsed_data['motion']}</p>
+            </div>
 
-        <div style="margin-top: 20px; padding: 20px; background: #e7f3ff;
-                    border-radius: 10px; border-left: 4px solid #2196f3;">
-            <h3 style="margin-top: 0; color: #333; font-size: 18px;">What the Conductor Noticed</h3>
-            <ul style="margin: 10px 0; padding-left: 20px; line-height: 1.8;">
-                {"".join(f'<li>{detail}</li>' for detail in parsed_data['notation_details'])}
-            </ul>
-        </div>
+            <div style="margin-bottom: 15px; padding: 15px; background: #e7f3ff;
+                        border-radius: 10px; border-left: 4px solid #2196f3;">
+                <h3 style="margin-top: 0; color: #333; font-size: 16px;">What the Conductor Noticed</h3>
+                <ul style="margin: 8px 0; padding-left: 20px; line-height: 1.6; font-size: 14px;">
+                    {"".join(f'<li style="margin-bottom: 5px;">{detail}</li>' for detail in parsed_data['notation_details'])}
+                </ul>
+            </div>
 
-        <div style="margin-top: 20px; padding: 20px; background: #fff3cd;
-                    border-radius: 10px; border-left: 4px solid #ffc107;">
-            <h3 style="margin-top: 0; color: #333; font-size: 18px;">Instructional Metaphors</h3>
-            <ul style="margin: 10px 0; padding-left: 20px; line-height: 1.8;">
-                {"".join(f'<li>{m}</li>' for m in parsed_data['instructional_metaphors'])}
-            </ul>
+            <div style="padding: 15px; background: #fff3cd;
+                        border-radius: 10px; border-left: 4px solid #ffc107;">
+                <h3 style="margin-top: 0; color: #333; font-size: 16px;">All Instructional Metaphors</h3>
+                <ul style="margin: 8px 0; padding-left: 20px; line-height: 1.6; font-size: 14px;">
+                    {"".join(f'<li style="margin-bottom: 5px;">{m}</li>' for m in parsed_data['instructional_metaphors'])}
+                </ul>
+            </div>
         </div>
         """
 
-        import json
         json_output = json.dumps(parsed_data, indent=2, ensure_ascii=False)
 
         logger.info("Analysis completed successfully")
-        return final_metaphor_html, json_output, ""
+        return final_metaphor_html, interpretability_html, json_output, parsed_data, ""
 
     except anthropic.APIError as e:
         error_msg = f"API Error: {str(e)}"
         logger.error(error_msg)
-        return "", "", error_msg
+        return "", "", "", {}, error_msg
     except Exception as e:
         error_msg = f"Unexpected error: {str(e)}"
         logger.error(error_msg, exc_info=True)
-        return "", "", error_msg
+        return "", "", "", {}, error_msg
+
+
+def handle_feedback(rating: int, parsed_data: Dict[str, Any]) -> str:
+    """
+    Handle user feedback submission.
+
+    Args:
+        rating: User rating (1-5)
+        parsed_data: The parsed analysis data
+
+    Returns:
+        Confirmation message
+    """
+    if not parsed_data or "final_metaphor" not in parsed_data:
+        return "Please analyze an image first before submitting feedback."
+
+    try:
+        save_feedback(parsed_data["final_metaphor"], rating, parsed_data)
+        return f"✓ Thank you for your feedback! (Rating: {rating}/5)"
+    except Exception as e:
+        logger.error(f"Failed to save feedback: {e}")
+        return "Failed to save feedback. Please try again."
 
 
 def create_ui() -> gr.Blocks:
@@ -278,42 +355,106 @@ def create_ui() -> gr.Blocks:
     Returns:
         Configured Gradio Blocks interface
     """
+    # Custom CSS for mobile optimization and Helvetica Neue font
+    custom_css = """
+    * {
+        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif !important;
+    }
+
+    /* Mobile-friendly adjustments */
+    @media (max-width: 768px) {
+        .gradio-container {
+            padding: 10px !important;
+        }
+
+        h1 {
+            font-size: 24px !important;
+        }
+
+        .gr-button {
+            font-size: 16px !important;
+            padding: 12px 20px !important;
+        }
+    }
+
+    /* Improve touch targets for mobile */
+    button {
+        min-height: 44px;
+    }
+
+    /* Better spacing on mobile */
+    .gr-form {
+        gap: 15px;
+    }
+    """
+
     with gr.Blocks(
-        title="Sheet Music Metaphor Analyzer",
-        theme=gr.themes.Soft()
+        title="Instructional Metaphors",
+        theme=gr.themes.Soft(),
+        css=custom_css
     ) as demo:
         gr.Markdown(
             """
-            # Sheet Music Metaphor Analyzer
+            # Instructional Metaphors
 
-            Upload a photo of sheet music and get poetic, sensory performance guidance from an AI conductor.
+            Take a photo of the sheet music you're practicing to receive an instructional metaphor that helps guide your practice of that piece or passage.
 
-            **Note:** You need your own [Anthropic API key](https://console.anthropic.com/) to use this app.
-            """
+            **Note:** Paste in the API key you were provided. If you're not sure whether you received an API key, contact Willie or Crystal.
+            """,
+            elem_classes=["main-header"]
         )
+
+        # State variables to track data and rerolls
+        current_image_state = gr.State(None)
+        parsed_data_state = gr.State({})
+        reroll_count_state = gr.State(0)
 
         with gr.Row():
             with gr.Column(scale=1):
                 image_input = gr.Image(
                     type="pil",
                     label="Upload Sheet Music Photo",
-                    height=400
+                    height=400,
+                    sources=["upload", "webcam"]  # Enable both upload and camera for mobile
                 )
 
                 api_key_input = gr.Textbox(
-                    label="Anthropic API Key (required)",
+                    label="API Key (provided by Willie or Crystal)",
                     type="password",
-                    placeholder="sk-ant-api-..."
+                    placeholder="Paste your API key here..."
                 )
 
-                analyze_btn = gr.Button(
-                    "Analyze Music",
-                    variant="primary",
-                    size="lg"
-                )
+                with gr.Row():
+                    analyze_btn = gr.Button(
+                        "Analyze Music",
+                        variant="primary",
+                        size="lg",
+                        scale=2
+                    )
+
+                    reroll_btn = gr.Button(
+                        "Reroll",
+                        variant="secondary",
+                        size="lg",
+                        scale=1,
+                        visible=False
+                    )
+
+                reroll_status = gr.Markdown("", visible=False)
 
             with gr.Column(scale=1):
                 result_html = gr.HTML(label="Result")
+
+                # Feedback section
+                with gr.Group(visible=False) as feedback_group:
+                    gr.Markdown("### How helpful was this metaphor?")
+                    with gr.Row():
+                        rating_1 = gr.Button("1 ⭐", size="sm")
+                        rating_2 = gr.Button("2 ⭐", size="sm")
+                        rating_3 = gr.Button("3 ⭐", size="sm")
+                        rating_4 = gr.Button("4 ⭐", size="sm")
+                        rating_5 = gr.Button("5 ⭐", size="sm")
+                    feedback_message = gr.Markdown("")
 
                 error_output = gr.Textbox(
                     label="Errors",
@@ -322,29 +463,117 @@ def create_ui() -> gr.Blocks:
                     lines=2
                 )
 
-                with gr.Accordion("Debug: Full JSON Response", open=False):
+                # Interpretability sections (hidden by default for users)
+                with gr.Accordion("Admin: Interpretability Details", open=False):
+                    interpretability_output = gr.HTML()
+
+                with gr.Accordion("Admin: Full JSON Response", open=False):
                     json_output = gr.Code(
                         label="Raw JSON",
                         language="json",
                         lines=15
                     )
 
-        # Event handlers
-        analyze_btn.click(
-            fn=analyze_sheet_music,
-            inputs=[image_input, api_key_input],
-            outputs=[result_html, json_output, error_output]
-        )
-
         gr.Markdown(
             """
             ---
             **Tips:**
-            - Upload clear photos of printed sheet music
-            - Works best with short musical phrases
-            - The app will provide sensory metaphors to guide your performance
+            - Take clear photos of printed sheet music
+            - Works best with short musical phrases (2-8 measures)
+            - You can reroll up to 3 times per photo to get different metaphors
             """
         )
+
+        # Analysis function that updates all outputs and states
+        def analyze_and_update(image, api_key):
+            if image is None:
+                return (
+                    "", "", "", {}, "Please upload an image first.",
+                    image, {}, 0, gr.update(visible=False), gr.update(visible=False), ""
+                )
+
+            metaphor_html, interp_html, json_out, parsed_data, error = analyze_sheet_music(image, api_key)
+
+            # Update reroll button visibility and status
+            show_reroll = (error == "" and parsed_data)
+            reroll_visible = gr.update(visible=show_reroll)
+            feedback_visible = gr.update(visible=show_reroll)
+            status_msg = "Rerolls remaining: 3" if show_reroll else ""
+
+            return (
+                metaphor_html, interp_html, json_out, parsed_data, error,
+                image, parsed_data, 0, reroll_visible, feedback_visible, status_msg
+            )
+
+        # Reroll function
+        def reroll_analysis(image, api_key, current_count):
+            if current_count >= 3:
+                return (
+                    gr.update(), gr.update(), gr.update(), gr.update(), "Maximum rerolls (3) reached for this image.",
+                    current_count, gr.update(visible=False), f"Maximum rerolls reached (3/3)"
+                )
+
+            if image is None:
+                return (
+                    gr.update(), gr.update(), gr.update(), gr.update(), "Please upload an image first.",
+                    current_count, gr.update(), f"Rerolls remaining: {3 - current_count}"
+                )
+
+            metaphor_html, interp_html, json_out, parsed_data, error = analyze_sheet_music(image, api_key)
+            new_count = current_count + 1
+            remaining = 3 - new_count
+
+            show_reroll = new_count < 3 and error == ""
+            status_msg = f"Rerolls remaining: {remaining}" if show_reroll else f"Maximum rerolls reached ({new_count}/3)"
+
+            return (
+                metaphor_html, interp_html, json_out, parsed_data, error,
+                new_count, gr.update(visible=show_reroll), status_msg
+            )
+
+        # Reset reroll count when new image is uploaded
+        def reset_reroll_count(image):
+            return 0, gr.update(visible=False), ""
+
+        # Event handlers
+        analyze_btn.click(
+            fn=analyze_and_update,
+            inputs=[image_input, api_key_input],
+            outputs=[
+                result_html, interpretability_output, json_output, parsed_data_state, error_output,
+                current_image_state, parsed_data_state, reroll_count_state,
+                reroll_btn, feedback_group, reroll_status
+            ]
+        ).then(
+            fn=lambda: gr.update(visible=True),
+            outputs=[reroll_status]
+        )
+
+        reroll_btn.click(
+            fn=reroll_analysis,
+            inputs=[current_image_state, api_key_input, reroll_count_state],
+            outputs=[
+                result_html, interpretability_output, json_output, parsed_data_state, error_output,
+                reroll_count_state, reroll_btn, reroll_status
+            ]
+        )
+
+        image_input.change(
+            fn=reset_reroll_count,
+            inputs=[image_input],
+            outputs=[reroll_count_state, reroll_btn, reroll_status]
+        )
+
+        # Feedback button handlers
+        def submit_rating(rating, data):
+            msg = handle_feedback(rating, data)
+            return msg
+
+        rating_1.click(lambda data: submit_rating(1, data), inputs=[parsed_data_state], outputs=[feedback_message])
+        rating_2.click(lambda data: submit_rating(2, data), inputs=[parsed_data_state], outputs=[feedback_message])
+        rating_3.click(lambda data: submit_rating(3, data), inputs=[parsed_data_state], outputs=[feedback_message])
+        rating_4.click(lambda data: submit_rating(4, data), inputs=[parsed_data_state], outputs=[feedback_message])
+        rating_5.click(lambda data: submit_rating(5, data), inputs=[parsed_data_state], outputs=[feedback_message])
 
     return demo
 
