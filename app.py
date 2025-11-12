@@ -681,14 +681,14 @@ def create_ui() -> gr.Blocks:
         font-weight: 600 !important;
         padding: 14px 10px !important;
         border-radius: 12px !important;
-        border: 2px solid #667eea !important;
-        transition: all 0.2s ease !important;
+        border: 1px solid #667eea !important;
+        transition: all 0.1s ease !important;
     }
 
     .rating-button:hover {
         background-color: #667eea !important;
         color: white !important;
-        transform: translateY(-2px) !important;
+        transform: translateY(-1px) !important;
     }
 
     /* Undo button styling */
@@ -697,6 +697,7 @@ def create_ui() -> gr.Blocks:
         font-size: 16px !important;
         padding: 10px 20px !important;
         margin-top: 10px !important;
+        box-shadow: none !important;
     }
 
     /* Feedback section styling */
@@ -709,7 +710,7 @@ def create_ui() -> gr.Blocks:
     }
 
     .feedback-title {
-        margin: 0 0 15px 0 !important;
+        margin: 0 0 8px 0 !important;
         font-size: 16px !important;
         font-weight: 500 !important;
     }
@@ -725,12 +726,6 @@ def create_ui() -> gr.Blocks:
         border-left: 4px solid #667eea !important;
     }
 
-    /* Instructional metaphor section header */
-    .metaphor-section-header {
-        font-size: 18px !important;
-        font-weight: 500 !important;
-        color: #667eea !important;
-    }
     """
 
     with gr.Blocks(
