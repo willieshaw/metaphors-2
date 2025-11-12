@@ -429,6 +429,15 @@ def create_ui() -> gr.Blocks:
     .gr-accordion {
         border-left: 4px solid #667eea !important;
     }
+
+    /* Instructional metaphor section header */
+    .metaphor-section-header {
+        font-size: 18px !important;
+        font-weight: 500 !important;
+        color: #667eea !important;
+        margin-bottom: 15px !important;
+        margin-top: 0 !important;
+    }
     """
 
     with gr.Blocks(
@@ -486,7 +495,13 @@ def create_ui() -> gr.Blocks:
                 reroll_status = gr.Markdown("", visible=False)
 
             with gr.Column(scale=1):
-                result_html = gr.HTML(label="Result")
+                # Main instructional metaphor output
+                gr.Markdown("### Instructional metaphor", elem_classes=["metaphor-section-header"])
+                result_html = gr.HTML(
+                    label="",
+                    show_label=False,
+                    value=""
+                )
 
                 # Feedback section
                 with gr.Group(visible=False, elem_classes=["feedback-section"]) as feedback_group:
