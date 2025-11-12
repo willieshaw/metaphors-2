@@ -147,7 +147,7 @@ def save_feedback(metaphor: str, rating: int, parsed_data: Dict[str, Any]) -> No
 def analyze_sheet_music(
     image: Optional[Image.Image],
     api_key: Optional[str] = None
-) -> Tuple[str, str, str, Dict[str, Any], str]:
+) -> Tuple[str, str, str, Dict[str, Any]]:
     """
     Analyze sheet music image using Claude Vision API.
 
@@ -156,10 +156,23 @@ def analyze_sheet_music(
         api_key: Optional API key (uses env var if not provided)
 
     Returns:
-        Tuple of (final_metaphor_html, interpretability_html, json_output, parsed_data_dict, error_message)
+        Tuple of (final_metaphor_html, interpretability_html, json_output, parsed_data_dict)
+        Errors are returned as HTML in the final_metaphor_html slot
     """
+    def create_error_html(error_msg: str) -> str:
+        """Create error HTML for display in metaphor box."""
+        return f"""
+        <div style="padding: 30px 20px; background: #fee; border: 2px solid #c33;
+                    border-radius: 15px; text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.1);">
+            <p style="color: #c33; font-size: clamp(16px, 5vw, 18px); font-weight: 500; line-height: 1.4;
+                      margin: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+                ⚠️ Error: {error_msg}
+            </p>
+        </div>
+        """
+
     if image is None:
-        return "", "", "", {}, "Please upload an image first."
+        return create_error_html("Please upload an image first."), "", "", {}
 
     # Get API key
     if not api_key:
@@ -168,7 +181,7 @@ def analyze_sheet_music(
     if not api_key:
         error_msg = "API key required. Please paste in the API key you were provided."
         logger.error(error_msg)
-        return "", "", "", {}, error_msg
+        return create_error_html(error_msg), "", "", {}
 
     try:
         # Resize image
@@ -265,7 +278,7 @@ def analyze_sheet_music(
 
         # Handle results
         if parsed_data is None:
-            return "", "", raw_response, {}, f"Failed to parse response: {error}"
+            return create_error_html(f"Failed to parse response: {error}"), "", raw_response, {}
 
         # Format main metaphor output
         final_metaphor_html = f"""
@@ -310,16 +323,16 @@ def analyze_sheet_music(
         json_output = json.dumps(parsed_data, indent=2, ensure_ascii=False)
 
         logger.info("Analysis completed successfully")
-        return final_metaphor_html, interpretability_html, json_output, parsed_data, ""
+        return final_metaphor_html, interpretability_html, json_output, parsed_data
 
     except anthropic.APIError as e:
         error_msg = f"API Error: {str(e)}"
         logger.error(error_msg)
-        return "", "", "", {}, error_msg
+        return create_error_html(error_msg), "", "", {}
     except Exception as e:
         error_msg = f"Unexpected error: {str(e)}"
         logger.error(error_msg, exc_info=True)
-        return "", "", "", {}, error_msg
+        return create_error_html(error_msg), "", "", {}
 
 
 def handle_feedback(rating: int, parsed_data: Dict[str, Any]) -> str:
@@ -461,7 +474,7 @@ def create_ui() -> gr.Blocks:
             with gr.Column(scale=1):
                 image_input = gr.Image(
                     type="pil",
-                    label="Take photo or drop image here",
+                    label="Take a photo",
                     height=400,
                     sources=["upload", "webcam"]  # Enable both upload and camera for mobile
                 )
@@ -519,16 +532,6 @@ def create_ui() -> gr.Blocks:
                         rating_5 = gr.Button("5", size="lg", elem_classes=["rating-button"])
                     feedback_message = gr.Markdown("")
 
-                # Error section (hidden in accordion)
-                with gr.Accordion("Errors", open=False, elem_classes=["accordion-title"]):
-                    error_output = gr.Textbox(
-                        label="",
-                        visible=True,
-                        interactive=False,
-                        lines=2,
-                        show_label=False
-                    )
-
                 # Interpretability sections (hidden by default for users)
                 with gr.Accordion("Admin: Interpretability Details", open=False, elem_classes=["accordion-title"]):
                     interpretability_output = gr.HTML()
@@ -553,47 +556,75 @@ def create_ui() -> gr.Blocks:
         # Analysis function that updates all outputs and states
         def analyze_and_update(image, api_key):
             if image is None:
+                error_html = """
+                <div style="padding: 30px 20px; background: #fee; border: 2px solid #c33;
+                            border-radius: 15px; text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.1);">
+                    <p style="color: #c33; font-size: clamp(16px, 5vw, 18px); font-weight: 500; line-height: 1.4;
+                              margin: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+                        ⚠️ Error: Please upload an image first.
+                    </p>
+                </div>
+                """
                 return (
-                    "", "", "", {}, "Please upload an image first.",
+                    error_html, "", "", {},
                     image, {}, 0, gr.update(visible=False), gr.update(visible=False), ""
                 )
 
-            metaphor_html, interp_html, json_out, parsed_data, error = analyze_sheet_music(image, api_key)
+            metaphor_html, interp_html, json_out, parsed_data = analyze_sheet_music(image, api_key)
 
             # Update reroll button visibility and status
-            show_reroll = (error == "" and parsed_data)
+            # Show reroll/feedback only if we got valid parsed data (not an error)
+            show_reroll = bool(parsed_data)
             reroll_visible = gr.update(visible=show_reroll)
             feedback_visible = gr.update(visible=show_reroll)
             status_msg = "Rerolls remaining: 3" if show_reroll else ""
 
             return (
-                metaphor_html, interp_html, json_out, parsed_data, error,
+                metaphor_html, interp_html, json_out, parsed_data,
                 image, parsed_data, 0, reroll_visible, feedback_visible, status_msg
             )
 
         # Reroll function
         def reroll_analysis(image, api_key, current_count):
             if current_count >= 3:
+                max_error_html = """
+                <div style="padding: 30px 20px; background: #fee; border: 2px solid #c33;
+                            border-radius: 15px; text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.1);">
+                    <p style="color: #c33; font-size: clamp(16px, 5vw, 18px); font-weight: 500; line-height: 1.4;
+                              margin: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+                        ⚠️ Error: Maximum rerolls (3) reached for this image.
+                    </p>
+                </div>
+                """
                 return (
-                    gr.update(), gr.update(), gr.update(), gr.update(), "Maximum rerolls (3) reached for this image.",
+                    max_error_html, gr.update(), gr.update(), gr.update(),
                     current_count, gr.update(visible=False), f"Maximum rerolls reached (3/3)"
                 )
 
             if image is None:
+                no_image_error_html = """
+                <div style="padding: 30px 20px; background: #fee; border: 2px solid #c33;
+                            border-radius: 15px; text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.1);">
+                    <p style="color: #c33; font-size: clamp(16px, 5vw, 18px); font-weight: 500; line-height: 1.4;
+                              margin: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+                        ⚠️ Error: Please upload an image first.
+                    </p>
+                </div>
+                """
                 return (
-                    gr.update(), gr.update(), gr.update(), gr.update(), "Please upload an image first.",
+                    no_image_error_html, gr.update(), gr.update(), gr.update(),
                     current_count, gr.update(), f"Rerolls remaining: {3 - current_count}"
                 )
 
-            metaphor_html, interp_html, json_out, parsed_data, error = analyze_sheet_music(image, api_key)
+            metaphor_html, interp_html, json_out, parsed_data = analyze_sheet_music(image, api_key)
             new_count = current_count + 1
             remaining = 3 - new_count
 
-            show_reroll = new_count < 3 and error == ""
+            show_reroll = new_count < 3 and bool(parsed_data)
             status_msg = f"Rerolls remaining: {remaining}" if show_reroll else f"Maximum rerolls reached ({new_count}/3)"
 
             return (
-                metaphor_html, interp_html, json_out, parsed_data, error,
+                metaphor_html, interp_html, json_out, parsed_data,
                 new_count, gr.update(visible=show_reroll), status_msg
             )
 
@@ -606,7 +637,7 @@ def create_ui() -> gr.Blocks:
             fn=analyze_and_update,
             inputs=[image_input, api_key_input],
             outputs=[
-                result_html, interpretability_output, json_output, parsed_data_state, error_output,
+                result_html, interpretability_output, json_output, parsed_data_state,
                 current_image_state, parsed_data_state, reroll_count_state,
                 reroll_btn, feedback_group, reroll_status
             ]
@@ -619,7 +650,7 @@ def create_ui() -> gr.Blocks:
             fn=reroll_analysis,
             inputs=[current_image_state, api_key_input, reroll_count_state],
             outputs=[
-                result_html, interpretability_output, json_output, parsed_data_state, error_output,
+                result_html, interpretability_output, json_output, parsed_data_state,
                 reroll_count_state, reroll_btn, reroll_status
             ]
         )
