@@ -700,6 +700,19 @@ def create_ui() -> gr.Blocks:
         box-shadow: none !important;
     }
 
+    /* Remove default padding from HTML component container */
+    .gradio-html {
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    /* Ensure metaphor box matches width of other components */
+    .metaphor-container {
+        width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
     /* Feedback section styling */
     .feedback-section {
         padding: 20px;
@@ -802,9 +815,10 @@ def create_ui() -> gr.Blocks:
                 result_html = gr.HTML(
                     label="",
                     show_label=False,
+                    elem_classes=["metaphor-container"],
                     value="""
                     <div style="padding: 30px 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                                border-radius: 15px; text-align: center;
+                                border-radius: 10px; text-align: center;
                                 min-height: 100px; display: flex; align-items: center; justify-content: center;">
                         <p style="color: rgba(255, 255, 255, 0.7); font-size: 16px; margin: 0;
                                   font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
