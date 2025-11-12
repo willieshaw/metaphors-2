@@ -669,7 +669,7 @@ def create_ui() -> gr.Blocks:
     /* Rating buttons styling */
     .rating-buttons {
         display: flex !important;
-        gap: 8px !important;
+        gap: 10px !important;
         flex-wrap: nowrap !important;
         width: 100% !important;
     }
@@ -677,10 +677,26 @@ def create_ui() -> gr.Blocks:
     .rating-button {
         flex: 1 1 0 !important;
         min-width: 0 !important;
-        font-size: 20px !important;
+        font-size: 22px !important;
         font-weight: 600 !important;
-        padding: 12px 8px !important;
-        border-radius: 4px;
+        padding: 14px 10px !important;
+        border-radius: 12px !important;
+        border: 2px solid #667eea !important;
+        transition: all 0.2s ease !important;
+    }
+
+    .rating-button:hover {
+        background-color: #667eea !important;
+        color: white !important;
+        transform: translateY(-2px) !important;
+    }
+
+    /* Undo button styling */
+    button.undo-button {
+        border-radius: 10px !important;
+        font-size: 16px !important;
+        padding: 10px 20px !important;
+        margin-top: 10px !important;
     }
 
     /* Feedback section styling */
@@ -758,13 +774,6 @@ def create_ui() -> gr.Blocks:
                     placeholder="Paste your API key here..."
                 )
 
-                prompt_selector = gr.Dropdown(
-                    choices=list(ANALYSIS_PROMPTS.keys()),
-                    value="Prompt 1 (Current)",
-                    label="Prompt Selection (for testing)",
-                    info="Select which prompt version to use for analysis"
-                )
-
                 with gr.Row():
                     analyze_btn = gr.Button(
                         "Analyze Sheet Music",
@@ -782,6 +791,15 @@ def create_ui() -> gr.Blocks:
                     )
 
                 reroll_status = gr.Markdown("", visible=False)
+
+                # Hidden prompt selector for testing
+                with gr.Accordion("Advanced Settings", open=False, visible=True):
+                    prompt_selector = gr.Dropdown(
+                        choices=list(ANALYSIS_PROMPTS.keys()),
+                        value="Prompt 1 (Current)",
+                        label="Prompt Selection (for testing)",
+                        info="Select which prompt version to use for analysis"
+                    )
 
             with gr.Column(scale=1):
                 # Main instructional metaphor output
@@ -811,7 +829,7 @@ def create_ui() -> gr.Blocks:
                         rating_4 = gr.Button("4", size="lg", elem_classes=["rating-button"])
                         rating_5 = gr.Button("5", size="lg", elem_classes=["rating-button"])
                     feedback_message = gr.Markdown("")
-                    undo_btn = gr.Button("Undo", visible=False, variant="secondary", size="sm")
+                    undo_btn = gr.Button("Undo", visible=False, variant="secondary", size="sm", elem_classes=["undo-button"])
 
                 # Interpretability sections (hidden by default for users)
                 with gr.Accordion("Interpretability Details", open=False, elem_classes=["accordion-title"]):
