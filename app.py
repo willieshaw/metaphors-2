@@ -166,7 +166,7 @@ def analyze_sheet_music(
                     border-radius: 15px; text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.1);">
             <p style="color: #c33; font-size: clamp(16px, 5vw, 18px); font-weight: 500; line-height: 1.4;
                       margin: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
-                ⚠️ Error: {error_msg}
+                Error: {error_msg}
             </p>
         </div>
         """
@@ -179,7 +179,7 @@ def analyze_sheet_music(
         api_key = os.getenv("ANTHROPIC_API_KEY")
 
     if not api_key:
-        error_msg = "API key required. Please paste in the API key you were provided."
+        error_msg = "API key required. Please paste in your API key."
         logger.error(error_msg)
         return create_error_html(error_msg), "", "", {}
 
@@ -283,7 +283,7 @@ def analyze_sheet_music(
         # Format main metaphor output
         final_metaphor_html = f"""
         <div style="padding: 30px 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    border-radius: 15px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
+                    border-radius: 15px; text-align: center;">
             <p style="color: white; font-size: clamp(20px, 6vw, 28px); font-weight: 500; line-height: 1.4;
                       font-style: italic; margin: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
                 {parsed_data['final_metaphor']}
@@ -351,7 +351,7 @@ def handle_feedback(rating: int, parsed_data: Dict[str, Any]) -> str:
 
     try:
         save_feedback(parsed_data["final_metaphor"], rating, parsed_data)
-        return f"✓ Thank you for your feedback! (Rating: {rating}/5)"
+        return f"Thank you for your feedback! (Rating: {rating}/5)"
     except Exception as e:
         logger.error(f"Failed to save feedback: {e}")
         return "Failed to save feedback. Please try again."
@@ -425,7 +425,6 @@ def create_ui() -> gr.Blocks:
         margin: 0 0 15px 0 !important;
         font-size: 16px !important;
         font-weight: 500 !important;
-        color: #333 !important;
     }
 
     /* Accordion title styling with purple */
@@ -444,8 +443,6 @@ def create_ui() -> gr.Blocks:
         font-size: 18px !important;
         font-weight: 500 !important;
         color: #667eea !important;
-        margin-bottom: 15px !important;
-        margin-top: 0 !important;
     }
     """
 
@@ -480,14 +477,14 @@ def create_ui() -> gr.Blocks:
                 )
 
                 api_key_input = gr.Textbox(
-                    label="API Key (provided by Willie or Crystal)",
+                    label="API Key",
                     type="password",
                     placeholder="Paste your API key here..."
                 )
 
                 with gr.Row():
                     analyze_btn = gr.Button(
-                        "Analyze Music",
+                        "Analyze Sheet Music",
                         variant="primary",
                         size="lg",
                         scale=2
@@ -505,13 +502,13 @@ def create_ui() -> gr.Blocks:
 
             with gr.Column(scale=1):
                 # Main instructional metaphor output
-                gr.Markdown("### Instructional metaphor", elem_classes=["metaphor-section-header"])
+                gr.Markdown()
                 result_html = gr.HTML(
                     label="",
                     show_label=False,
                     value="""
                     <div style="padding: 30px 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                                border-radius: 15px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+                                border-radius: 15px; text-align: center;
                                 min-height: 100px; display: flex; align-items: center; justify-content: center;">
                         <p style="color: rgba(255, 255, 255, 0.7); font-size: 16px; margin: 0;
                                   font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
@@ -533,10 +530,10 @@ def create_ui() -> gr.Blocks:
                     feedback_message = gr.Markdown("")
 
                 # Interpretability sections (hidden by default for users)
-                with gr.Accordion("Admin: Interpretability Details", open=False, elem_classes=["accordion-title"]):
+                with gr.Accordion("Interpretability Details", open=False, elem_classes=["accordion-title"]):
                     interpretability_output = gr.HTML()
 
-                with gr.Accordion("Admin: Full JSON Response", open=False, elem_classes=["accordion-title"]):
+                with gr.Accordion("Full JSON Response", open=False, elem_classes=["accordion-title"]):
                     json_output = gr.Code(
                         label="Raw JSON",
                         language="json",
@@ -561,7 +558,7 @@ def create_ui() -> gr.Blocks:
                             border-radius: 15px; text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.1);">
                     <p style="color: #c33; font-size: clamp(16px, 5vw, 18px); font-weight: 500; line-height: 1.4;
                               margin: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
-                        ⚠️ Error: Please upload an image first.
+                        Error: Please upload an image first.
                     </p>
                 </div>
                 """
@@ -592,7 +589,7 @@ def create_ui() -> gr.Blocks:
                             border-radius: 15px; text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.1);">
                     <p style="color: #c33; font-size: clamp(16px, 5vw, 18px); font-weight: 500; line-height: 1.4;
                               margin: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
-                        ⚠️ Error: Maximum rerolls (3) reached for this image.
+                        Error: Maximum rerolls (3) reached for this image.
                     </p>
                 </div>
                 """
@@ -607,7 +604,7 @@ def create_ui() -> gr.Blocks:
                             border-radius: 15px; text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.1);">
                     <p style="color: #c33; font-size: clamp(16px, 5vw, 18px); font-weight: 500; line-height: 1.4;
                               margin: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
-                        ⚠️ Error: Please upload an image first.
+                        Error: Please upload an image first.
                     </p>
                 </div>
                 """
