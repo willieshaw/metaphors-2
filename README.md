@@ -12,7 +12,17 @@ Quick steps:
 1. Create a free [Hugging Face](https://huggingface.co/) account
 2. Create a new Space with Gradio SDK
 3. Upload these files or connect your GitHub repo
-4. Share the URL - users provide their own API keys
+4. Set up persistent feedback storage (optional) - **[Setup Guide →](HF_FEEDBACK_SETUP.md)**
+5. Share the URL - users provide their own API keys
+
+## Feedback Storage
+
+The app includes a 5-star rating system for user feedback on metaphors. Feedback can be stored:
+
+- **On Hugging Face Spaces**: Set `HF_TOKEN` secret to enable persistent storage to a HF Dataset
+- **Locally**: Automatically saves to `./feedback/ratings.csv` (for development/testing)
+
+**[Complete Feedback Setup Guide →](HF_FEEDBACK_SETUP.md)**
 
 ## Features
 

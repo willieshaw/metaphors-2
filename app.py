@@ -15,6 +15,12 @@ import anthropic
 import gradio as gr
 from PIL import Image
 
+try:
+    from huggingface_hub import HfApi, hf_hub_download
+    HF_AVAILABLE = True
+except ImportError:
+    HF_AVAILABLE = False
+
 from utils import (
     parse_and_validate_json,
     save_analysis_log,
@@ -100,16 +106,89 @@ def image_to_base64(image: Image.Image) -> str:
 
 def save_feedback(metaphor: str, rating: int, parsed_data: Dict[str, Any]) -> None:
     """
-    Save user feedback to CSV file.
+    Save user feedback to Hugging Face Dataset (if HF_TOKEN available) or CSV file (fallback).
 
     Args:
         metaphor: The final metaphor that was rated
         rating: User rating (1-5)
         parsed_data: Full parsed response data
     """
+    # Prepare feedback data
+    feedback_entry = {
+        "timestamp": datetime.now().isoformat(),
+        "rating": rating,
+        "final_metaphor": metaphor,
+        "mood": parsed_data.get("mood", ""),
+        "gesture": parsed_data.get("gesture", ""),
+        "motion": parsed_data.get("motion", ""),
+        "instructional_metaphors": " | ".join(parsed_data.get("instructional_metaphors", [])),
+        "notation_details": " | ".join(parsed_data.get("notation_details", []))
+    }
+
+    # Try to save to Hugging Face Dataset
+    hf_token = os.getenv("HF_TOKEN")
+    hf_dataset_name = os.getenv("HF_DATASET_NAME", "sheet-music-feedback")
+
+    if HF_AVAILABLE and hf_token:
+        try:
+            api = HfApi(token=hf_token)
+
+            # Get HF username from token
+            user_info = api.whoami()
+            username = user_info['name']
+            dataset_id = f"{username}/{hf_dataset_name}"
+
+            # Download existing data or create new
+            try:
+                # Try to download existing dataset
+                local_file = hf_hub_download(
+                    repo_id=dataset_id,
+                    filename="feedback.csv",
+                    repo_type="dataset",
+                    token=hf_token
+                )
+                # Read existing data
+                import pandas as pd
+                df = pd.read_csv(local_file)
+                # Append new feedback
+                df = pd.concat([df, pd.DataFrame([feedback_entry])], ignore_index=True)
+            except Exception:
+                # Dataset doesn't exist yet, create new DataFrame
+                import pandas as pd
+                df = pd.DataFrame([feedback_entry])
+
+            # Save to temporary file
+            temp_file = Path("./temp_feedback.csv")
+            df.to_csv(temp_file, index=False)
+
+            # Upload to HF
+            api.upload_file(
+                path_or_fileobj=str(temp_file),
+                path_in_repo="feedback.csv",
+                repo_id=dataset_id,
+                repo_type="dataset",
+                commit_message=f"Add feedback: rating {rating}"
+            )
+
+            # Create dataset if it doesn't exist
+            try:
+                api.create_repo(repo_id=dataset_id, repo_type="dataset", private=False, exist_ok=True)
+            except Exception:
+                pass  # Repo might already exist
+
+            # Clean up temp file
+            if temp_file.exists():
+                temp_file.unlink()
+
+            logger.info(f"Feedback saved to HF dataset {dataset_id}: rating={rating}, metaphor={metaphor[:50]}...")
+            return
+
+        except Exception as e:
+            logger.warning(f"Failed to save to HF dataset, falling back to CSV: {e}")
+
+    # Fallback to CSV (for local development or if HF fails)
     feedback_dir = Path("./feedback")
     feedback_dir.mkdir(exist_ok=True)
-
     feedback_file = feedback_dir / "ratings.csv"
 
     # Check if file exists to write header
@@ -131,17 +210,17 @@ def save_feedback(metaphor: str, rating: int, parsed_data: Dict[str, Any]) -> No
             ])
 
         writer.writerow([
-            datetime.now().isoformat(),
-            rating,
-            metaphor,
-            parsed_data.get("mood", ""),
-            parsed_data.get("gesture", ""),
-            parsed_data.get("motion", ""),
-            " | ".join(parsed_data.get("instructional_metaphors", [])),
-            " | ".join(parsed_data.get("notation_details", []))
+            feedback_entry["timestamp"],
+            feedback_entry["rating"],
+            feedback_entry["final_metaphor"],
+            feedback_entry["mood"],
+            feedback_entry["gesture"],
+            feedback_entry["motion"],
+            feedback_entry["instructional_metaphors"],
+            feedback_entry["notation_details"]
         ])
 
-    logger.info(f"Feedback saved: rating={rating}, metaphor={metaphor[:50]}...")
+    logger.info(f"Feedback saved to local CSV: rating={rating}, metaphor={metaphor[:50]}...")
 
 
 def analyze_sheet_music(
