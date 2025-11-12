@@ -30,8 +30,11 @@ from utils import (
 # Initialize logger
 logger = setup_logging()
 
-# Claude API prompt
-ANALYSIS_PROMPT = """You are an experienced music conductor and teacher analyzing sheet music to provide performance guidance.
+# Multiple Claude API prompts for testing
+# To add/edit prompts: simply add or modify entries in this dictionary
+# Each prompt must return the same JSON schema
+ANALYSIS_PROMPTS = {
+    "Prompt 1 (Current)": """You are an experienced music conductor and teacher analyzing sheet music to provide performance guidance.
 
 Follow this step-by-step process:
 
@@ -67,7 +70,16 @@ Return ONLY valid JSON matching this exact schema:
   "final_metaphor": "one simple, direct metaphor"
 }
 
-Remember: Return ONLY the JSON object, no additional text or explanation."""
+Remember: Return ONLY the JSON object, no additional text or explanation.""",
+
+    "Prompt 2": """[Add your second test prompt here - must return the same JSON schema]""",
+
+    "Prompt 3": """[Add your third test prompt here - must return the same JSON schema]""",
+
+    "Prompt 4": """[Add your fourth test prompt here - must return the same JSON schema]""",
+
+    "Prompt 5": """[Add your fifth test prompt here - must return the same JSON schema]"""
+}
 
 
 def resize_image(image: Image.Image, max_width: int = 1400) -> Image.Image:
@@ -225,7 +237,8 @@ def save_feedback(metaphor: str, rating: int, parsed_data: Dict[str, Any]) -> No
 
 def analyze_sheet_music(
     image: Optional[Image.Image],
-    api_key: Optional[str] = None
+    api_key: Optional[str] = None,
+    prompt_key: str = "Prompt 1 (Current)"
 ) -> Tuple[str, str, str, Dict[str, Any]]:
     """
     Analyze sheet music image using Claude Vision API.
@@ -233,6 +246,7 @@ def analyze_sheet_music(
     Args:
         image: PIL Image of sheet music
         api_key: Optional API key (uses env var if not provided)
+        prompt_key: Which prompt to use from ANALYSIS_PROMPTS dictionary
 
     Returns:
         Tuple of (final_metaphor_html, interpretability_html, json_output, parsed_data_dict)
@@ -294,7 +308,7 @@ def analyze_sheet_music(
                         },
                         {
                             "type": "text",
-                            "text": ANALYSIS_PROMPT
+                            "text": ANALYSIS_PROMPTS[prompt_key]
                         }
                     ],
                 }
@@ -561,6 +575,13 @@ def create_ui() -> gr.Blocks:
                     placeholder="Paste your API key here..."
                 )
 
+                prompt_selector = gr.Dropdown(
+                    choices=list(ANALYSIS_PROMPTS.keys()),
+                    value="Prompt 1 (Current)",
+                    label="Prompt Selection (for testing)",
+                    info="Select which prompt version to use for analysis"
+                )
+
                 with gr.Row():
                     analyze_btn = gr.Button(
                         "Analyze Sheet Music",
@@ -630,7 +651,7 @@ def create_ui() -> gr.Blocks:
         )
 
         # Analysis function that updates all outputs and states
-        def analyze_and_update(image, api_key):
+        def analyze_and_update(image, api_key, prompt_key):
             if image is None:
                 error_html = """
                 <div style="padding: 30px 20px; background: #fee; border: 2px solid #c33;
@@ -646,7 +667,7 @@ def create_ui() -> gr.Blocks:
                     image, {}, 0, gr.update(visible=False), gr.update(visible=False), ""
                 )
 
-            metaphor_html, interp_html, json_out, parsed_data = analyze_sheet_music(image, api_key)
+            metaphor_html, interp_html, json_out, parsed_data = analyze_sheet_music(image, api_key, prompt_key)
 
             # Update reroll button visibility and status
             # Show reroll/feedback only if we got valid parsed data (not an error)
@@ -661,7 +682,7 @@ def create_ui() -> gr.Blocks:
             )
 
         # Reroll function
-        def reroll_analysis(image, api_key, current_count):
+        def reroll_analysis(image, api_key, prompt_key, current_count):
             if current_count >= 3:
                 max_error_html = """
                 <div style="padding: 30px 20px; background: #fee; border: 2px solid #c33;
@@ -692,7 +713,7 @@ def create_ui() -> gr.Blocks:
                     current_count, gr.update(), f"Rerolls remaining: {3 - current_count}"
                 )
 
-            metaphor_html, interp_html, json_out, parsed_data = analyze_sheet_music(image, api_key)
+            metaphor_html, interp_html, json_out, parsed_data = analyze_sheet_music(image, api_key, prompt_key)
             new_count = current_count + 1
             remaining = 3 - new_count
 
@@ -711,7 +732,7 @@ def create_ui() -> gr.Blocks:
         # Event handlers
         analyze_btn.click(
             fn=analyze_and_update,
-            inputs=[image_input, api_key_input],
+            inputs=[image_input, api_key_input, prompt_selector],
             outputs=[
                 result_html, interpretability_output, json_output, parsed_data_state,
                 current_image_state, parsed_data_state, reroll_count_state,
@@ -724,7 +745,7 @@ def create_ui() -> gr.Blocks:
 
         reroll_btn.click(
             fn=reroll_analysis,
-            inputs=[current_image_state, api_key_input, reroll_count_state],
+            inputs=[current_image_state, api_key_input, prompt_selector, reroll_count_state],
             outputs=[
                 result_html, interpretability_output, json_output, parsed_data_state,
                 reroll_count_state, reroll_btn, reroll_status
