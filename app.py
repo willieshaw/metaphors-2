@@ -34,7 +34,7 @@ logger = setup_logging()
 # To add/edit prompts: simply add or modify entries in this dictionary
 # Each prompt must return the same JSON schema
 ANALYSIS_PROMPTS = {
-    "Prompt 1": """You are an experienced music conductor and teacher analyzing sheet music to provide performance guidance.
+    "Prompt 1 (Current)": """You are an experienced music conductor and teacher analyzing sheet music to provide performance guidance.
 
 Follow this step-by-step process:
 
@@ -96,8 +96,8 @@ Based on your analysis, create exactly 3 simple, direct instructional metaphors 
 
 STEP 4: FINAL METAPHOR
 Now, keep in mind the following weights as you deliver your final metaphor: The mood 25%, gesture 25%, motion 50%. 
-Synthesize everything above — including 20% more emphasis on the Notation Insights — into one concise, simple instructional metaphor that reflects how emotion, gesture, and movement emerge directly from the score.
-Keep it direct and practical, giving a clear, physical image the performer can immediately use.
+Synthesize everything above — including 20% more emphasis on the Notation Insights — into one concise, simple instructional metaphor that reflects how emotion, gesture, and movement emerge directly from the score. You can pick one of the three you've already generated or write a new one.
+Keep it direct and practical, giving a clear, physical image the performer can immediately use. Avoid overly poetic or elaborate language.
 
 Return ONLY valid JSON matching this exact schema:
 
@@ -680,6 +680,7 @@ def create_ui() -> gr.Blocks:
         font-size: 20px !important;
         font-weight: 600 !important;
         padding: 12px 8px !important;
+        border-radius: 4px;
     }
 
     /* Feedback section styling */
